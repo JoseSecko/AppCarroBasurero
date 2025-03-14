@@ -1,126 +1,97 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 
 class MapScreen extends StatefulWidget {
+  final LatLng? initialReportLocation;
   final Function(LatLng) onLocationSelected;
   final Function(LatLng) onUserLocationObtained;
 
-  MapScreen({required this.onLocationSelected, required this.onUserLocationObtained});
+   MapScreen({this.initialReportLocation, required this.onLocationSelected, required this.onUserLocationObtained});
 
   @override
   _MapScreenState createState() => _MapScreenState();
 }
 
-Future<Position> _determinePosition() async {
-  bool serviceEnabled;
-  LocationPermission permission;
-
-  serviceEnabled = await Geolocator.isLocationServiceEnabled();
-  if (!serviceEnabled) {
-    throw Exception('Location services are disabled.');
-  }
-
-  permission = await Geolocator.checkPermission();
-  if (permission == LocationPermission.denied) {
-    permission = await Geolocator.requestPermission();
-    if (permission == LocationPermission.denied) {
-      throw Exception('Location permissions are denied');
-    }
-  }
-
-  if (permission == LocationPermission.deniedForever) {
-    throw Exception('Location permissions are permanently denied');
-  }
-
-  return await Geolocator.getCurrentPosition();
-}
-
-
 class _MapScreenState extends State<MapScreen> {
-  LatLng _initialPosition = LatLng(-17.7833, -63.1821);
-  GoogleMapController? _controller;
-  bool _isMapExpanded = false;
+  GoogleMapController? _mapController;
   LatLng? _userLocation;
   LatLng? _reportLocation;
-  Future<void> _getCurrentLocation() async {
-    try {
-      Position position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      LatLng userLocation = LatLng(position.latitude, position.longitude);
-      widget.onUserLocationObtained(userLocation);
-      setState(() {
-        _userLocation = userLocation;
-        _initialPosition = userLocation;
-      });
-      _controller?.animateCamera(CameraUpdate.newLatLng(userLocation));
-    } catch (e) {
-      print('Could not get the location: $e');
-    }
-  }
+  StreamSubscription<Position>? _positionStream;
 
-
-  void _onMapCreated(GoogleMapController controller) {
-    _controller = controller;
-    _getCurrentLocation().catchError((error) {
-      print('Error getting user location: $error');
-    });
-  }
-
-
-  void _toggleMapSize() {
-    setState(() {
-      _isMapExpanded = !_isMapExpanded;
-    });
-  }
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation();  // Llama a esta función para establecer la ubicación del usuario al cargar
+    _reportLocation = widget.initialReportLocation;
+    _startLocationUpdates();
   }
+
+  @override
+  void dispose() {
+    _positionStream?.cancel(); // Detener la actualización de la ubicación al salir
+    super.dispose();
+  }
+
+  void _startLocationUpdates() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return;
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return;
+    }
+    if (permission == LocationPermission.deniedForever) return;
+
+    // Obtener ubicación en tiempo real
+    _positionStream = Geolocator.getPositionStream(
+      locationSettings: LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 10),
+    ).listen((Position position) {
+      LatLng newLocation = LatLng(position.latitude, position.longitude);
+      setState(() {
+        _userLocation = newLocation;
+      });
+
+      widget.onUserLocationObtained(newLocation);
+
+      // Mover la cámara solo la primera vez
+      if (_mapController != null && _reportLocation == null) {
+        _mapController!.animateCamera(CameraUpdate.newLatLng(newLocation));
+      }
+    });
+  }
+
+  void _selectReportLocation(LatLng position) {
+    setState(() {
+      _reportLocation = position; // Guardar ubicación del reporte
+    });
+    widget.onLocationSelected(position);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: _isMapExpanded ? MediaQuery.of(context).size.height : 300,
-      child: Stack(
-        children: [
-          GoogleMap(
-            onMapCreated: _onMapCreated,
-            initialCameraPosition: CameraPosition(
-              target: _initialPosition,
-              zoom: 14.0,
+      height: 300,
+      child: GoogleMap(
+        initialCameraPosition: CameraPosition(
+          target: _reportLocation ?? _userLocation ?? LatLng(-17.3935, -66.157),
+          zoom: 15,
+        ),
+        myLocationEnabled: true, // Punto azul del usuario
+        myLocationButtonEnabled: true,
+        onMapCreated: (controller) {
+          _mapController = controller;
+        },
+        markers: {
+          if (_reportLocation != null)
+            Marker(
+              markerId: MarkerId("reportLocation"),
+              position: _reportLocation!,
+              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
             ),
-            onTap: (LatLng position) {
-              setState(() {
-                _reportLocation = position;
-                _controller?.animateCamera(CameraUpdate.newLatLng(position));
-              });
-              widget.onLocationSelected(position);
-            },
-            markers: {
-              if (_reportLocation != null) Marker(
-                markerId: MarkerId("reportLocation"),
-                position: _reportLocation!,
-                draggable: true,
-                onDragEnd: (newPosition) {
-                  print(newPosition.latitude);
-                  print(newPosition.longitude);
-                },
-              ),
-            },
-                    myLocationEnabled: true,  // Muestra la ubicación actual del usuario como un punto azul.
-                    myLocationButtonEnabled: true,
-          ),
-          Positioned(
-            top: 10,
-            right: 10,
-            child: FloatingActionButton(
-              onPressed: _toggleMapSize,
-              child: Icon(Icons.zoom_out_map),
-            ),
-          )
-        ],
+        },
+        onTap: _selectReportLocation, // Marcar ubicación del reporte al tocar el mapa
       ),
     );
   }
