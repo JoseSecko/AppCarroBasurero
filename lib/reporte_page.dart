@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:app_carro_basurero/home_page.dart';
+import 'package:app_carro_basurero/home_residente.dart';
 import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -121,7 +121,7 @@ class _ReportPageState extends State<ReportPage> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => HomePage()),
+        MaterialPageRoute(builder: (context) => HomeResidentePage()),
       );
     }
   }

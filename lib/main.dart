@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'login_page.dart';
-import 'home_page.dart';
-import 'registro_localizacion_page.dart'; // Asegúrate de importar la página de registro de localización
+import 'home_residente.dart';
+import 'registro_localizacion_page.dart'; 
+import 'home_conductor.dart'; // Asegúrate de importar la pantalla del conductor
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 void main() async {
@@ -37,30 +38,35 @@ class MyApp extends StatelessWidget {
                 future: FirebaseFirestore.instance.collection('Usuarios').doc(user.uid).get(),
                 builder: (context, AsyncSnapshot<DocumentSnapshot> docSnapshot) {
                   if (docSnapshot.connectionState == ConnectionState.done) {
-                    // Asegurarse de que el snapshot y los datos no son nulos
-                    if (docSnapshot.data != null && docSnapshot.data!.exists) {
-                      // Asegurarse de hacer un cast seguro de los datos a Map<String, dynamic>
+                    if (docSnapshot.hasData && docSnapshot.data!.exists) {
                       Map<String, dynamic>? data = docSnapshot.data!.data() as Map<String, dynamic>?;
 
-                      // Comprobar si la clave 'posicion' no existe en los datos
-                      if (data != null && !data.containsKey('location')) {
-                        return registro_localizacion_page(); // Redirige a la página de registro de localización
-                      } else {
-                        return HomePage(); // El usuario tiene la clave 'posicion', continuar a HomePage
+                      if (data != null) {
+                        String? rol = data['rol']; // Obtiene el rol del usuario
+
+                        if (rol == "conductor") {
+                          return HomeConductorPage(); // Página para conductores
+                        } else {
+                          if (!data.containsKey('location')) {
+                            return registro_localizacion_page(); // Registro de ubicación para residentes
+                          } else {
+                            return HomeResidentePage(); // Página del residente
+                          }
+                        }
                       }
-                    } else {
-                      return registro_localizacion_page(); // No hay datos, asumir que necesita registro de localización
                     }
+                    return registro_localizacion_page(); // Si no hay datos, asumir que es nuevo
                   } else {
-                    return CircularProgressIndicator(); // Aún cargando datos
+                    return CircularProgressIndicator();
                   }
                 },
               );
             }
           }
-          return CircularProgressIndicator(); // Muestra un indicador de carga mientras se verifica el estado de autenticación
+          return CircularProgressIndicator();
         },
       ),
     );
   }
 }
+

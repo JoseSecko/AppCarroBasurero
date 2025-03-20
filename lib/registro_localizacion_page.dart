@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'home_page.dart'; 
+import 'home_residente.dart'; 
 
 class registro_localizacion_page extends StatefulWidget {
   @override
@@ -37,7 +37,7 @@ class _registro_localizacion_pageState extends State<registro_localizacion_page>
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => HomePage()),
+        MaterialPageRoute(builder: (context) => HomeResidentePage()),
       );
     }
   }

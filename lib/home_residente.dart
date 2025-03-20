@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'drawer_menu.dart';  // Asegúrate de importar el DrawerMenu
 
-class HomePage extends StatelessWidget {
+class HomeResidentePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
