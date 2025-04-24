@@ -7,6 +7,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'map_screen.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
 
 class ReportPage extends StatefulWidget {
   @override
@@ -57,6 +61,34 @@ class _ReportPageState extends State<ReportPage> {
       }
     }
   }
+  Future<Map<String, dynamic>> obtenerDatosExifDesdeCloudRun(String imageUrl) async {
+  try {
+    final url = Uri.parse('https://verificador-imagen-835858854447.southamerica-east1.run.app');
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'imageUrl': imageUrl}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      print("📸 Metadatos recibidos desde Cloud Run:");
+      print(data);
+
+      if (data['esValida'] == true && data['datos'] != null) {
+        return Map<String, dynamic>.from(data['datos']);
+      }
+    } else {
+      print("❌ Respuesta con error: ${response.statusCode}");
+    }
+  } catch (e) {
+    print("❌ Error al llamar a Cloud Run: $e");
+  }
+
+  return {};
+}
+
+
 
   Future<String?> uploadFile(XFile? file) async {
     if (file == null) return null;
@@ -98,6 +130,9 @@ class _ReportPageState extends State<ReportPage> {
       });
 
       String? imageUrl = await uploadFile(_image);
+      Map<String, dynamic> exif = await obtenerDatosExifDesdeCloudRun(imageUrl!);
+      print('🛰️ Metadatos recibidos desde Cloud Run:');
+      print(exif);
       String userId = user.uid;
       DateTime timestamp = DateTime.now();
 
@@ -109,6 +144,13 @@ class _ReportPageState extends State<ReportPage> {
         'userLocation': GeoPoint(_userLocation!.latitude, _userLocation!.longitude),
         'userId': userId,
         'timestamp': timestamp,
+        'make': exif['Make'] ?? '',
+        'model': exif['Model'] ?? '',
+        'dateTime': exif['DateTime'] ?? '',
+        'imageGpsLocation': exif['Latitude'] != null && exif['Longitude'] != null
+          ? GeoPoint(exif['Latitude'], exif['Longitude'])
+          : null, // 🛰️ guarda solo si hay coordenadas
+        
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
